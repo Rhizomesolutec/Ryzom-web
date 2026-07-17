@@ -67,6 +67,14 @@ export default function WhyRyzom() {
   const [activeIdx, setActiveIdx] = useState(0);
   const activeStage = STAGES[activeIdx];
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveIdx((prev) => (prev + 1) % STAGES.length);
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [activeIdx]);
+
   const magneticRefs = [
     useMagnetic(0.2),
     useMagnetic(0.2),
