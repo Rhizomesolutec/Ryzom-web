@@ -5,6 +5,7 @@ import CustomCursor from "@/components/CustomCursor";
 import Navbar from "@/components/Navbar";
 import NeuralBackground from "@/components/NeuralBackground";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import Preloader from "@/components/Preloader";
 
 export const metadata: Metadata = {
   title: "RYZOM | Intelligent Digital Experiences",
@@ -52,6 +53,8 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth h-full antialiased dark">
       <body className="relative min-h-full bg-black text-white selection:bg-brand-blue selection:text-white flex flex-col noise-overlay">
+        <Preloader />
+
         {/* Custom cursor layer (Client only) */}
         <CustomCursor />
 

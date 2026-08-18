@@ -1,12 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-
-if (typeof window !== "undefined") {
-  gsap.registerPlugin(ScrollTrigger);
-}
 
 const TARGET_SELECTORS = [
   "#hero-core-start",
@@ -29,6 +24,10 @@ const TARGET_SELECTORS = [
   "#work-card-2",
   "#work-card-3",
   "#about-core-foundation",
+  "#about-node-0",
+  "#about-node-1",
+  "#about-node-2",
+  "#about-node-3",
   "#contact-logo"
 ];
 
@@ -56,6 +55,92 @@ interface Particle {
   speed?: number;
 }
 
+interface JourneyStep {
+  id: string;
+  sectionId: string;
+  targetSelector: string;
+  whyRyzomStageIdx?: number;
+  servicesCardIdx?: number;
+  workCardIdx?: number;
+  aboutCardIdx?: number;
+}
+
+const JOURNEY_STEPS: JourneyStep[] = [
+  { id: "hero", sectionId: "hero", targetSelector: "#hero-core-start" },
+
+  { id: "why-ryzom-0", sectionId: "why-ryzom", targetSelector: "#why-ryzom-node-0", whyRyzomStageIdx: 0 },
+  { id: "why-ryzom-1", sectionId: "why-ryzom", targetSelector: "#why-ryzom-node-1", whyRyzomStageIdx: 1 },
+  { id: "why-ryzom-2", sectionId: "why-ryzom", targetSelector: "#why-ryzom-node-2", whyRyzomStageIdx: 2 },
+  { id: "why-ryzom-3", sectionId: "why-ryzom", targetSelector: "#why-ryzom-node-3", whyRyzomStageIdx: 3 },
+  { id: "why-ryzom-4", sectionId: "why-ryzom", targetSelector: "#why-ryzom-node-4", whyRyzomStageIdx: 4 },
+
+  { id: "services-0", sectionId: "services", targetSelector: "#services-card-0", servicesCardIdx: 0 },
+  { id: "services-1", sectionId: "services", targetSelector: "#services-card-1", servicesCardIdx: 1 },
+  { id: "services-2", sectionId: "services", targetSelector: "#services-card-2", servicesCardIdx: 2 },
+  { id: "services-3", sectionId: "services", targetSelector: "#services-card-3", servicesCardIdx: 3 },
+  { id: "services-4", sectionId: "services", targetSelector: "#services-card-4", servicesCardIdx: 4 },
+
+  { id: "work-0", sectionId: "work", targetSelector: "#work-card-0", workCardIdx: 0 },
+  { id: "work-1", sectionId: "work", targetSelector: "#work-card-1", workCardIdx: 1 },
+  { id: "work-2", sectionId: "work", targetSelector: "#work-card-2", workCardIdx: 2 },
+  { id: "work-3", sectionId: "work", targetSelector: "#work-card-3", workCardIdx: 3 },
+
+  // About — foundation, then each timeline card one-by-one
+  { id: "about-foundation", sectionId: "about", targetSelector: "#about-core-foundation" },
+  { id: "about-0", sectionId: "about", targetSelector: "#about-node-0", aboutCardIdx: 0 },
+  { id: "about-1", sectionId: "about", targetSelector: "#about-node-1", aboutCardIdx: 1 },
+  { id: "about-2", sectionId: "about", targetSelector: "#about-node-2", aboutCardIdx: 2 },
+  { id: "about-3", sectionId: "about", targetSelector: "#about-node-3", aboutCardIdx: 3 },
+
+  { id: "contact", sectionId: "contact", targetSelector: "#contact-logo" },
+];
+
+function scrollToY(y: number, duration = 0.55) {
+  const maxScroll = Math.max(
+    0,
+    (document.documentElement.scrollHeight || document.body.scrollHeight) - window.innerHeight
+  );
+  const top = Math.max(0, Math.min(y, maxScroll));
+  const lenis = (window as any).lenis;
+  if (lenis) {
+    // Interrupt any in-flight scroll so reverse never queues / feels stuck
+    lenis.scrollTo(top, { duration, immediate: false, force: true, lock: false });
+  } else {
+    window.scrollTo({ top, behavior: "smooth" });
+  }
+}
+
+/** Snap section flush to viewport top — avoids mid-gap landings between sections */
+function getSectionScrollY(sectionId: string): number {
+  if (sectionId === "hero") return 0;
+  const el = document.getElementById(sectionId);
+  if (!el) return window.scrollY;
+
+  const rect = el.getBoundingClientRect();
+  return window.scrollY + rect.top;
+}
+
+/** Center a journey target in the viewport (About / Contact) */
+function getTargetCenteredScrollY(selector: string): number {
+  const el = document.querySelector(selector) as HTMLElement | null;
+  if (!el) return window.scrollY;
+  const rect = el.getBoundingClientRect();
+  return window.scrollY + rect.top - window.innerHeight / 2 + rect.height / 2;
+}
+
+function getWorkStepScrollY(workCardIdx: number): number {
+  // Home Work is horizontal-pinned — scrub within pin distance
+  const work = document.getElementById("work");
+  if (!work) return window.scrollY;
+  const base = getSectionScrollY("work");
+  const track = work.querySelector('[style*="max-content"]') as HTMLElement | null;
+  const scrollWidth = track?.scrollWidth ?? window.innerWidth;
+  const pinDist = Math.max(scrollWidth - window.innerWidth, 0);
+  const total = JOURNEY_STEPS.filter((s) => s.workCardIdx !== undefined).length;
+  const t = workCardIdx / Math.max(total - 1, 1);
+  return base + pinDist * t;
+}
+
 export default function LivingCore() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -65,13 +150,15 @@ export default function LivingCore() {
   const [isReady, setIsReady] = useState(false);
   const [isDissolved, setIsDissolved] = useState(false);
 
-  // Mouse tracking
-  const mouseRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0, active: false });
+  const stepRef = useRef(0);
+  const isLockRef = useRef(false);
+  const lockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevSectionRef = useRef<string>("hero");
+  const dissolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Physics positions
+  const mouseRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0, active: false });
   const posRef = useRef({ currentX: 0, currentY: 0, targetX: 0, targetY: 0 });
 
-  // Responsive scale hook (Mobile: 33px, Tablet: 48px, Desktop: 52px)
   const [coreScale, setCoreScale] = useState(1.0);
   const scaleRef = useRef(1.0);
 
@@ -79,13 +166,9 @@ export default function LivingCore() {
     const handleResize = () => {
       const w = window.innerWidth;
       let scale = 1.0;
-      if (w <= 768) {
-        scale = 0.635; // Keeps mobile size at 33px (52 * 0.635 ≈ 33px)
-      } else if (w <= 1024) {
-        scale = 0.923; // Keeps tablet size at 48px (52 * 0.923 ≈ 48px)
-      } else {
-        scale = 1.0;   // Desktop size: 52px (13% smaller than 60px)
-      }
+      if (w <= 768) scale = 0.635;
+      else if (w <= 1024) scale = 0.923;
+      else scale = 1.0;
       setCoreScale(scale);
       scaleRef.current = scale;
     };
@@ -94,18 +177,16 @@ export default function LivingCore() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 1. Identify which anchors are present in the DOM
   useEffect(() => {
     const scanTargets = () => {
       const present = TARGET_SELECTORS.filter((sel) => document.querySelector(sel) !== null);
       setExistingTargets(present);
     };
 
-    // Delay scan slightly to let Next.js client-side hydrate completely
     const timer = setTimeout(() => {
       scanTargets();
       setIsReady(true);
-    }, 800);
+    }, 600);
 
     window.addEventListener("resize", scanTargets);
     return () => {
@@ -114,66 +195,202 @@ export default function LivingCore() {
     };
   }, []);
 
-  // 2. Set up ScrollTrigger to animate progressIndex smoothly across targets
+  const executeStep = useCallback((targetStepIdx: number) => {
+    const newIdx = Math.max(0, Math.min(JOURNEY_STEPS.length - 1, targetStepIdx));
+    // Already on this step (e.g. last Contact step) — don't re-fire scroll to page bottom
+    if (newIdx === stepRef.current) return;
+
+    const prevIdx = stepRef.current;
+    const goingUp = newIdx < prevIdx;
+    stepRef.current = newIdx;
+    const step = JOURNEY_STEPS[newIdx];
+    const prevStep = JOURNEY_STEPS[prevIdx];
+
+    // 1. Move core toward this journey target (snappy — kills prior tween so reverse isn't lagged)
+    const elemIdx = existingTargets.indexOf(step.targetSelector);
+    if (elemIdx !== -1) {
+      gsap.killTweensOf(stateRef.current);
+      gsap.to(stateRef.current, {
+        progressIndex: elemIdx,
+        duration: goingUp ? 0.4 : 0.55,
+        ease: "power2.out",
+        overwrite: true,
+      });
+
+      if (dissolveTimerRef.current) {
+        clearTimeout(dissolveTimerRef.current);
+        dissolveTimerRef.current = null;
+      }
+
+      if (step.sectionId === "contact") {
+        dissolveTimerRef.current = setTimeout(() => {
+          if (stepRef.current === newIdx) setIsDissolved(true);
+        }, 500);
+      } else {
+        setIsDissolved(false);
+      }
+    }
+
+    // 2. Scroll — shorter durations on reverse so upward never feels stuck
+    const scrollDur = goingUp ? 0.45 : 0.55;
+    const sectionChanged = !prevStep || prevStep.sectionId !== step.sectionId;
+
+    if (step.sectionId === "why-ryzom") {
+      if (sectionChanged || prevSectionRef.current !== "why-ryzom") {
+        scrollToY(getSectionScrollY("why-ryzom"), scrollDur);
+      }
+    } else if (step.sectionId === "work" && step.workCardIdx !== undefined) {
+      scrollToY(getWorkStepScrollY(step.workCardIdx), scrollDur);
+    } else if (step.sectionId === "services" && step.servicesCardIdx !== undefined) {
+      scrollToY(getTargetCenteredScrollY(step.targetSelector), scrollDur);
+    } else if (step.sectionId === "about" || step.sectionId === "contact") {
+      scrollToY(getTargetCenteredScrollY(step.targetSelector), scrollDur);
+    } else {
+      scrollToY(getSectionScrollY(step.sectionId), scrollDur);
+    }
+
+    prevSectionRef.current = step.sectionId;
+
+    // 3. Why Ryzom — activate stage one-by-one
+    if (step.whyRyzomStageIdx !== undefined) {
+      const nodeBtn = document.getElementById(`why-ryzom-node-${step.whyRyzomStageIdx}`);
+      if (nodeBtn) nodeBtn.click();
+    }
+
+    // 4. Services glow
+    for (let i = 0; i < 5; i++) {
+      const card = document.getElementById(`services-card-${i}`);
+      if (!card) continue;
+      if (step.servicesCardIdx === i) {
+        card.classList.add("services-card-glow-active");
+        const brandColors = ["235, 87, 87", "47, 128, 236", "33, 150, 82", "242, 201, 77", "154, 81, 224"];
+        card.style.setProperty("--active-glow-color", brandColors[i]);
+      } else {
+        card.classList.remove("services-card-glow-active");
+      }
+    }
+
+    // 5. Work glow
+    for (let i = 0; i < 4; i++) {
+      const card = document.getElementById(`work-card-${i}`);
+      if (!card) continue;
+      if (step.workCardIdx === i) {
+        card.classList.add("work-card-glow-active");
+        const brandColors = ["235, 87, 87", "47, 128, 236", "33, 150, 82", "242, 201, 77"];
+        card.style.setProperty("--active-glow-color", brandColors[i]);
+      } else {
+        card.classList.remove("work-card-glow-active");
+      }
+    }
+
+    // 6. About milestone glow
+    const foundation = document.getElementById("about-core-foundation");
+    if (foundation) {
+      if (step.id === "about-foundation") {
+        foundation.classList.add("about-foundation-glow-active");
+      } else {
+        foundation.classList.remove("about-foundation-glow-active");
+      }
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const row = document.getElementById(`about-card-${i}`);
+      const panel = row?.querySelector(".about-milestone-panel") as HTMLElement | null;
+      if (!row || !panel) continue;
+      if (step.aboutCardIdx === i) {
+        panel.classList.add("about-card-glow-active");
+        const brandColors = ["47, 128, 236", "235, 87, 87", "33, 150, 82", "154, 81, 224"];
+        panel.style.setProperty("--active-glow-color", brandColors[i]);
+      } else {
+        panel.classList.remove("about-card-glow-active");
+      }
+    }
+
+    // Shorter lock on reverse so upward scroll stays fluid
+    isLockRef.current = true;
+    if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+    lockTimerRef.current = setTimeout(() => {
+      isLockRef.current = false;
+      lockTimerRef.current = null;
+    }, goingUp ? 320 : 480);
+  }, [existingTargets]);
+
+  // Wheel / arrow / touch — step journey; fast flicks skip steps so reverse isn't sticky
   useEffect(() => {
     if (!isReady || existingTargets.length === 0) return;
 
-    // Track scroll timeline
-    const state = stateRef.current;
-
-    // Create scrubbed GSAP timeline
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: "body",
-        start: "top top",
-        end: "bottom bottom",
-        scrub: 1.5,
-        onUpdate: (self) => {
-          // Detect if we've reached the final contact logo target (last index)
-          const isAtEnd = self.progress > 0.96;
-          setIsDissolved(isAtEnd);
-        }
+    const handleWheel = (e: WheelEvent) => {
+      // While locked, still prevent native scroll fighting Lenis — but don't queue
+      if (isLockRef.current) {
+        e.preventDefault();
+        return;
       }
-    });
+      if (Math.abs(e.deltaY) < 10) return;
+      e.preventDefault();
 
-    // Smooth continuous timeline for flow (not stuck anywhere, slow flow)
-    tl.to(state, {
-      progressIndex: existingTargets.length - 1,
-      ease: "none",
-    });
+      const dir = e.deltaY > 0 ? 1 : -1;
+      // Strong upward/downward flick advances multiple journey steps
+      const burst = Math.min(3, Math.max(1, Math.round(Math.abs(e.deltaY) / 90)));
+      executeStep(stepRef.current + dir * burst);
+    };
+
+    let touchStartY = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY;
+    };
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (isLockRef.current) return;
+      const deltaY = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(deltaY) < 36) return;
+      const dir = deltaY > 0 ? 1 : -1;
+      const burst = Math.min(3, Math.max(1, Math.round(Math.abs(deltaY) / 120)));
+      executeStep(stepRef.current + dir * burst);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isLockRef.current) return;
+      if (["ArrowDown", "PageDown", "Space"].includes(e.code)) {
+        e.preventDefault();
+        executeStep(stepRef.current + 1);
+      } else if (["ArrowUp", "PageUp"].includes(e.code)) {
+        e.preventDefault();
+        executeStep(stepRef.current - 1);
+      }
+    };
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      tl.kill();
-      ScrollTrigger.getAll().forEach((t) => {
-        if (typeof document !== "undefined" && t.trigger === document.body) {
-          t.kill();
-        }
-      });
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("keydown", handleKeyDown);
+      if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+      if (dissolveTimerRef.current) clearTimeout(dissolveTimerRef.current);
     };
-  }, [isReady, existingTargets]);
+  }, [isReady, existingTargets, executeStep]);
 
-  // 3. Track Mouse movements for magnetic effect
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current.targetX = e.clientX;
       mouseRef.current.targetY = e.clientY;
       mouseRef.current.active = true;
     };
-
     const handleMouseLeave = () => {
       mouseRef.current.active = false;
     };
-
     window.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseleave", handleMouseLeave);
-
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseleave", handleMouseLeave);
     };
   }, []);
 
-  // 4. Setup Canvas Particle System and Lerp Loop
+  // Setup Canvas Particle System and Animation Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -210,10 +427,6 @@ export default function LivingCore() {
       });
     }
 
-    // Reaction tracking state
-    let lastMethodologyNode = -1;
-    let lastActiveServiceCard = -1;
-
     let animFrame: number;
 
     const updateAndRender = () => {
@@ -232,6 +445,7 @@ export default function LivingCore() {
 
       let rawX = window.innerWidth / 2;
       let rawY = window.innerHeight / 2;
+      let targetOnScreen = false;
 
       if (elA && elB) {
         const rectA = elA.getBoundingClientRect();
@@ -244,35 +458,35 @@ export default function LivingCore() {
 
         rawX = xA * (1 - weight) + xB * weight;
         rawY = yA * (1 - weight) + yB * weight;
+        targetOnScreen =
+          rawY > -60 && rawY < window.innerHeight + 60 &&
+          rawX > -60 && rawX < window.innerWidth + 60;
       } else if (elA) {
         const rectA = elA.getBoundingClientRect();
         rawX = rectA.left + rectA.width / 2;
         rawY = rectA.top + rectA.height / 2;
+        targetOnScreen =
+          rawY > -60 && rawY < window.innerHeight + 60 &&
+          rawX > -60 && rawX < window.innerWidth + 60;
       }
 
-      // Constrain Y coordinate to remain near the top of the viewport (like passing on a road)
-      const targetY = window.innerHeight * 0.15;
-      let tx = rawX;
-      let ty = targetY;
-
-      if (index < 1.0) {
-        // Hero Section: Blend from start position to top Y
-        const blend = Math.max(0, 1 - index);
-        ty = rawY * blend + targetY * (1 - blend);
-      } else if (index > existingTargets.length - 2) {
-        // Contact Section: Blend from top Y to final contact logo position
-        const blend = Math.min(1, index - (existingTargets.length - 2));
-        ty = targetY * (1 - blend) + rawY * blend;
+      // If target is still off-screen (scroll catching up), hold last position —
+      // never pin the Core to the bottom edge of the viewport
+      let tx: number;
+      let ty: number;
+      if (!targetOnScreen && posRef.current.currentX !== 0) {
+        tx = posRef.current.targetX || posRef.current.currentX;
+        ty = posRef.current.targetY || posRef.current.currentY;
       } else {
-        // Middle sections: strictly stay at the top to simulate driving on a road
-        ty = targetY;
+        tx = rawX;
+        ty = Math.max(80, Math.min(window.innerHeight - 80, rawY));
       }
 
-      // Add a slow, organic breathing float & noise drift (Living guide feeling)
+      // Add a slow, organic breathing float & noise drift
       const time = Date.now() * 0.0012;
-      const breathing = Math.sin(time * 1.5) * 12;
-      const driftX = Math.sin(time) * 10;
-      const driftY = Math.cos(time * 0.8) * 10;
+      const breathing = Math.sin(time * 1.5) * 10;
+      const driftX = Math.sin(time) * 8;
+      const driftY = Math.cos(time * 0.8) * 8;
 
       tx += driftX;
       ty += breathing + driftY;
@@ -295,78 +509,6 @@ export default function LivingCore() {
       posRef.current.currentX = cx;
       posRef.current.currentY = cy;
 
-      // 5. Environmental Reactions & Triggers
-
-      // (A) WhyRyzom Section: Trigger stages click
-      const roundedIndex = Math.round(index);
-      // Index indices 3 to 7 correspond to why-ryzom-node-0 to why-ryzom-node-4
-      if (roundedIndex >= 3 && roundedIndex <= 7) {
-        const stageIdx = roundedIndex - 3;
-        if (stageIdx !== lastMethodologyNode) {
-          lastMethodologyNode = stageIdx;
-          const nodeBtn = document.getElementById(`why-ryzom-node-${stageIdx}`);
-          if (nodeBtn) {
-            nodeBtn.click();
-          }
-        }
-      }
-
-      // (B) Services Section Glow highlights
-      // Indices 9 to 13 correspond to services-card-0 to services-card-4
-      for (let i = 0; i < 5; i++) {
-        const card = document.getElementById(`services-card-${i}`);
-        if (card) {
-          if (roundedIndex === i + 9) {
-            card.classList.add("services-card-glow-active");
-            // Set dynamic Tailwind RGB color variable matching card color
-            const brandColors = ["235, 87, 87", "47, 128, 236", "33, 150, 82", "242, 201, 77", "154, 81, 224"];
-            card.style.setProperty("--active-glow-color", brandColors[i]);
-          } else {
-            card.classList.remove("services-card-glow-active");
-          }
-        }
-      }
-
-      // (C) Work Section project glows
-      // Indices 15 to 18 correspond to work-card-0 to work-card-3
-      for (let i = 0; i < 4; i++) {
-        const card = document.getElementById(`work-card-${i}`);
-        if (card) {
-          if (roundedIndex === i + 15) {
-            card.classList.add("work-card-glow-active");
-            const brandColors = ["47, 128, 236", "235, 87, 87", "33, 150, 82", "242, 201, 77"];
-            card.style.setProperty("--active-glow-color", brandColors[i]);
-          } else {
-            card.classList.remove("work-card-glow-active");
-          }
-        }
-      }
-
-      // (D) About Foundation Glow
-      const aboutFoundation = document.getElementById("about-core-foundation");
-      if (aboutFoundation) {
-        if (roundedIndex === 19) {
-          aboutFoundation.classList.add("about-foundation-glow-active");
-        } else {
-          aboutFoundation.classList.remove("about-foundation-glow-active");
-        }
-      }
-
-      // (E) Hero Trunk Glow
-      const heroTrunkPath = document.getElementById("hero-root-path");
-      const heroTrunkTrail = document.getElementById("hero-root-trail");
-      if (heroTrunkPath && heroTrunkTrail) {
-        if (roundedIndex >= 1 && roundedIndex <= 2) {
-          heroTrunkPath.style.filter = "drop-shadow(0 0 10px rgba(154, 81, 224, 0.9))";
-          (heroTrunkPath as any).style.strokeWidth = "5.5px";
-          (heroTrunkTrail as any).style.opacity = "1.0";
-        } else {
-          heroTrunkPath.style.filter = "none";
-          (heroTrunkPath as any).style.strokeWidth = "3.5px";
-          (heroTrunkTrail as any).style.opacity = "0.6";
-        }
-      }
-
       // Mouse Lerp Spring Physics
       const mouse = mouseRef.current;
       mouse.x += (mouse.targetX - mouse.x) * 0.1;
@@ -387,7 +529,7 @@ export default function LivingCore() {
         }
       }
 
-      // Update HTML core glass shell position (Using translate(-50%, -50%) for perfect auto-centering)
+      // Update HTML core glass shell position
       const coreHtml = coreRef.current;
       if (coreHtml) {
         if (isDissolved) {
@@ -399,17 +541,15 @@ export default function LivingCore() {
         }
       }
 
-      // 6. Draw Particle System
-
-      // --- A. Draw Trail Particles ---
-      // Emit trail particle if moving (Scale emitter spread and particle sizes)
+      // Draw Particle System
+      // A. Trail Particles
       const coreSpeed = Math.hypot(tx - cx, ty - cy);
       if (!isDissolved && coreSpeed > 0.8 && Math.random() < 0.6) {
         trail.push({
           x: drawX + (Math.random() - 0.5) * 8 * scaleRef.current,
           y: drawY + (Math.random() - 0.5) * 8 * scaleRef.current,
           vx: (Math.random() - 0.5) * 0.5,
-          vy: (Math.random() - 0.5) * 0.5 + 0.2, // slight upward drift
+          vy: (Math.random() - 0.5) * 0.5 + 0.2,
           size: (Math.random() * 2.5 + 0.8) * scaleRef.current,
           color: COLORS[Math.floor(Math.random() * COLORS.length)],
           life: 45,
@@ -417,7 +557,6 @@ export default function LivingCore() {
         });
       }
 
-      // Update and draw trails
       for (let i = trail.length - 1; i >= 0; i--) {
         const p = trail[i];
         p.life--;
@@ -425,10 +564,8 @@ export default function LivingCore() {
           trail.splice(i, 1);
           continue;
         }
-
         p.x += p.vx;
         p.y += p.vy;
-
         const ratio = p.life / p.maxLife;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * ratio, 0, Math.PI * 2);
@@ -441,18 +578,14 @@ export default function LivingCore() {
       ctx.globalAlpha = 1.0;
       ctx.shadowBlur = 0;
 
-      // --- B. Draw Orbit Particles (Scale orbits and size)
+      // B. Orbit Particles
       if (!isDissolved) {
         orbiters.forEach((p) => {
           if (p.angle !== undefined && p.radius !== undefined && p.speed !== undefined) {
-            // Speed up orbits if magnetic attraction active
             const speedMult = isMagnetic ? 2.5 : 1.0;
             p.angle += p.speed * speedMult;
-
-            // Animate radius breathing
             const breathe = Math.sin(Date.now() * 0.003 + p.angle) * 3;
             const r = (p.radius + breathe + (isMagnetic ? -6 : 0)) * scaleRef.current;
-
             p.x = drawX + Math.cos(p.angle) * r;
             p.y = drawY + Math.sin(p.angle) * r;
 
@@ -469,15 +602,14 @@ export default function LivingCore() {
         ctx.shadowBlur = 0;
       }
 
-      // --- C. Draw Logo Dispersion Particles ---
+      // C. Logo Dispersion Particles
       if (isDissolved) {
-        // Emit dispersing cloud from the final destination logo
         if (Math.random() < 0.55) {
           disperse.push({
             x: drawX + (Math.random() - 0.5) * 80 * scaleRef.current,
             y: drawY + (Math.random() - 0.5) * 20 * scaleRef.current,
             vx: (Math.random() - 0.5) * 0.8,
-            vy: -Math.random() * 0.8 - 0.3, // flow upward
+            vy: -Math.random() * 0.8 - 0.3,
             size: (Math.random() * 2.2 + 0.6) * scaleRef.current,
             color: COLORS[Math.floor(Math.random() * COLORS.length)],
             life: 60,
@@ -486,7 +618,6 @@ export default function LivingCore() {
         }
       }
 
-      // Update and draw dispersion cloud
       for (let i = disperse.length - 1; i >= 0; i--) {
         const p = disperse[i];
         p.life--;
@@ -494,10 +625,8 @@ export default function LivingCore() {
           disperse.splice(i, 1);
           continue;
         }
-
         p.x += p.vx;
         p.y += p.vy;
-
         const ratio = p.life / p.maxLife;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size * ratio, 0, Math.PI * 2);
@@ -528,12 +657,13 @@ export default function LivingCore() {
       ref={containerRef}
       className="fixed inset-0 w-full h-full pointer-events-none z-50 overflow-hidden"
     >
-      {/* Background canvas for trails, rays, and orbiting particles */}
+      {/* Canvas for particle system */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
       {/* 3D Glassmorphic Living Core Sphere */}
       <div
         ref={coreRef}
+        id="living-core-sphere"
         className="absolute rounded-full pointer-events-none transition-all duration-300 ease-out flex items-center justify-center"
         style={{
           width: `${52 * coreScale}px`,
@@ -548,36 +678,51 @@ export default function LivingCore() {
             inset 0 ${2.5 * coreScale}px ${4.5 * coreScale}px rgba(255, 255, 255, 0.4),
             inset 0 -${2.5 * coreScale}px ${4.5 * coreScale}px rgba(0, 0, 0, 0.5),
             0 ${8 * coreScale}px ${26 * coreScale}px rgba(0, 0, 0, 0.8),
-            0 0 ${16 * coreScale}px rgba(47, 128, 236, 0.15)
+            0 0 ${16 * coreScale}px rgba(47, 128, 236, 0.35),
+            0 0 ${28 * coreScale}px rgba(255, 255, 255, 0.12)
           `
         }}
       >
-        {/* Dynamic rotating internal gradient core */}
         <div
-          className="rounded-full animate-spin-slow-core opacity-90 relative"
+          className="absolute rounded-full animate-spin-slow-core opacity-45"
           style={{
-            width: `${20.8 * coreScale}px`,
-            height: `${20.8 * coreScale}px`,
-            background: "conic-gradient(from 0deg, #2F80EC, #EB5757, #219652, #F2C94D, #9A51E0, #F3994B, #2F80EC)",
-            filter: `blur(${1.7 * coreScale}px)`,
-            boxShadow: `
-              0 0 ${8 * coreScale}px rgba(47, 128, 236, 0.8),
-              0 0 ${16 * coreScale}px rgba(235, 87, 87, 0.6),
-              0 0 ${24 * coreScale}px rgba(33, 150, 82, 0.4)
-            `
+            width: `${28 * coreScale}px`,
+            height: `${28 * coreScale}px`,
+            background: "conic-gradient(from 0deg, #2F80EC55, #EB575755, #21965255, #F2C94D55, #9A51E055, #F3994B55, #2F80EC55)",
+            filter: `blur(${4 * coreScale}px)`,
           }}
-        >
-          {/* Extremely bright nucleus spot */}
-          <div
-            className="absolute bg-white rounded-full filter blur-[1px]"
-            style={{
-              inset: `${5.2 * coreScale}px`,
-              boxShadow: `0 0 ${10 * coreScale}px #fff`
-            }}
-          />
-        </div>
+          aria-hidden
+        />
 
-        {/* Outer dynamic breathing halo ring */}
+        <svg
+          viewBox="0 0 24 28"
+          className="relative z-10"
+          style={{
+            width: `${16 * coreScale}px`,
+            height: `${19 * coreScale}px`,
+            filter: `drop-shadow(0 0 ${3.5 * coreScale}px rgba(255,255,255,0.75))`,
+          }}
+          fill="none"
+          aria-hidden
+        >
+          <line
+            x1="12"
+            y1="1.5"
+            x2="12"
+            y2="9.5"
+            stroke="rgba(255,255,255,0.95)"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <path
+            d="M4.5 25.5 L12 12.5 L19.5 25.5"
+            stroke="rgba(255,255,255,0.95)"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+
         <div
           className="absolute rounded-full border border-white/10 opacity-30 animate-pulse"
           style={{

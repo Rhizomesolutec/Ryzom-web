@@ -51,33 +51,56 @@ export default function About() {
       className="relative min-h-screen py-32 bg-black overflow-hidden select-none"
     >
       <div className="max-w-5xl mx-auto px-6 md:px-12 relative z-10 flex flex-col items-center">
-        {/* Core SVG Foundation (The Root meets the stable base) */}
-        <div id="about-core-foundation" className="w-[150px] h-[150px] mb-16 flex items-center justify-center relative">
-          <svg viewBox="0 0 100 100" fill="none" className="w-full h-full animate-pulse-slow">
-            {/* Pulsing Outer Rings */}
-            <circle cx="50" cy="50" r="48" stroke="rgba(47, 128, 236, 0.1)" strokeWidth="1" />
-            <circle cx="50" cy="50" r="42" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
-            <circle cx="50" cy="50" r="32" stroke="rgba(235, 87, 87, 0.15)" strokeWidth="1" />
-            
-            {/* Stable Solid Central Base */}
-            <circle
-              cx="50"
-              cy="50"
-              r="22"
-              fill="#000000"
-              stroke="#FFFFFF"
-              strokeWidth="2.5"
-              style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.4))" }}
+        {/* Core foundation — same stylized Y as Living Core / navbar logo */}
+        <div id="about-core-foundation" className="w-[120px] h-[120px] md:w-[140px] md:h-[140px] mb-16 flex items-center justify-center relative">
+          <div
+            className="absolute inset-0 rounded-full animate-pulse-slow"
+            style={{
+              background: "radial-gradient(circle at 40% 35%, rgba(255,255,255,0.08) 0%, transparent 65%)",
+              border: "1.5px solid rgba(255,255,255,0.25)",
+              boxShadow:
+                "0 0 24px rgba(47,128,236,0.2), inset 0 0 20px rgba(255,255,255,0.06)",
+            }}
+          />
+          <div
+            className="absolute rounded-full opacity-40"
+            style={{
+              inset: "18%",
+              background: "conic-gradient(from 0deg, #2F80EC44, #EB575744, #21965244, #F2C94D44, #9A51E044, #2F80EC44)",
+              filter: "blur(8px)",
+            }}
+            aria-hidden
+          />
+          {/* Navbar logo Y — same geometry as Living Core */}
+          <svg
+            viewBox="0 0 24 28"
+            className="relative z-10 w-10 h-12 md:w-12 md:h-14"
+            fill="none"
+            aria-hidden
+            style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.55))" }}
+          >
+            <line
+              x1="12"
+              y1="1.5"
+              x2="12"
+              y2="9.5"
+              stroke="rgba(255,255,255,0.95)"
+              strokeWidth="2.4"
+              strokeLinecap="round"
             />
-            {/* Stylized Logo Icon in Center */}
             <path
-              d="M 50 40 V 55 M 50 55 L 42 63 M 50 55 L 58 63"
-              stroke="#FFFFFF"
-              strokeWidth="2.5"
+              d="M4.5 25.5 L12 12.5 L19.5 25.5"
+              stroke="rgba(255,255,255,0.95)"
+              strokeWidth="2.4"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
           </svg>
+          <div
+            className="absolute rounded-full border border-white/10 opacity-40 animate-pulse"
+            style={{ inset: "-6px" }}
+            aria-hidden
+          />
         </div>
 
         {/* Storytelling & Philosophy */}
@@ -108,12 +131,16 @@ export default function About() {
             {MILESTONES.map((milestone, idx) => (
               <div
                 key={milestone.phase}
-                className={`flex flex-col md:flex-row w-full items-start md:items-center relative ${
+                id={`about-card-${idx}`}
+                className={`flex flex-col md:flex-row w-full items-start md:items-center relative transition-shadow duration-500 ${
                   idx % 2 === 0 ? "md:flex-row-reverse" : "md:flex-row"
                 }`}
               >
-                {/* Visual Connector Dot */}
-                <div className="absolute left-[-1px] md:left-1/2 w-4 h-4 bg-black border-2 border-white rounded-full transform -translate-x-[7.5px] md:-translate-x-2 z-10">
+                {/* Visual Connector Dot — Living Core lands here per stage */}
+                <div
+                  id={`about-node-${idx}`}
+                  className="absolute left-[-1px] md:left-1/2 w-4 h-4 bg-black border-2 border-white rounded-full transform -translate-x-[7.5px] md:-translate-x-2 z-10"
+                >
                   <div
                     className="w-1.5 h-1.5 rounded-full absolute top-[3px] left-[3px]"
                     style={{
@@ -134,7 +161,7 @@ export default function About() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true, margin: "-100px" }}
                     transition={{ duration: 0.6, delay: 0.1 }}
-                    className="glass-panel p-8 rounded-2xl border border-white/5 w-full md:max-w-md shadow-lg"
+                    className="about-milestone-panel glass-panel p-8 rounded-2xl border border-white/5 w-full md:max-w-md shadow-lg transition-[box-shadow,border-color] duration-500"
                   >
                     <span
                       className="text-[10px] font-cascadia font-semibold tracking-wider px-2.5 py-0.5 rounded-full border mb-4 inline-block"
