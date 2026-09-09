@@ -147,8 +147,8 @@ export default function Contact() {
                 </div>
                 <div>
                   <span className="text-[9px] uppercase tracking-wider font-cascadia text-white/30 block">Call us</span>
-                  <a href="tel:+919876543210" className="text-xs font-cascadia text-white hover:text-white transition-colors">
-                    +91 98765 43210
+                  <a href="tel:+919744643646" className="text-xs font-cascadia text-white hover:text-white transition-colors">
+                    +91 97446 43646
                   </a>
                 </div>
               </div>
