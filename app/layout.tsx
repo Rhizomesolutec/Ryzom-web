@@ -30,9 +30,9 @@ export const metadata: Metadata = {
     siteName: "RYZOM",
     images: [
       {
-        url: "/vercel.svg", // Fallback to verify
-        width: 800,
-        height: 600,
+        url: "/Images/Ryzom%20logo.webp",
+        width: 1440,
+        height: 1440,
         alt: "RYZOM Logo",
       },
     ],
