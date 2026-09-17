@@ -51,8 +51,12 @@ export default function NeuralBackground() {
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseleave", handleMouseLeave);
 
-    // Initialize neural network nodes
-    const nodeCount = Math.min(100, Math.floor((window.innerWidth * window.innerHeight) / 12000));
+    // Initialize neural network nodes — lighter on mobile for scroll performance
+    const isMobile = window.innerWidth <= 768;
+    const nodeCount = Math.min(
+      isMobile ? 28 : 100,
+      Math.floor((window.innerWidth * window.innerHeight) / (isMobile ? 28000 : 12000))
+    );
     const nodes: Node[] = [];
     for (let i = 0; i < nodeCount; i++) {
       nodes.push({
@@ -65,13 +69,18 @@ export default function NeuralBackground() {
       });
     }
 
-    // Initialize large volumetric background glows
-    const glows: Glow[] = [
-      { x: canvas.width * 0.25, y: canvas.height * 0.25, vx: 0.15, vy: 0.1, color: "rgba(235, 87, 87, 0.08)", radius: 300, targetRadius: 300 }, // Brand Red
-      { x: canvas.width * 0.75, y: canvas.height * 0.3, vx: -0.1, vy: 0.15, color: "rgba(47, 128, 236, 0.08)", radius: 350, targetRadius: 350 }, // Brand Blue
-      { x: canvas.width * 0.5, y: canvas.height * 0.7, vx: 0.08, vy: -0.12, color: "rgba(33, 150, 82, 0.08)", radius: 400, targetRadius: 400 },  // Brand Green
-      { x: canvas.width * 0.8, y: canvas.height * 0.8, vx: -0.12, vy: -0.08, color: "rgba(154, 81, 224, 0.08)", radius: 300, targetRadius: 300 }, // Brand Purple
-    ];
+    // Initialize large volumetric background glows (2 on mobile, 4 on desktop)
+    const glows: Glow[] = isMobile
+      ? [
+          { x: canvas.width * 0.3, y: canvas.height * 0.3, vx: 0.12, vy: 0.08, color: "rgba(235, 87, 87, 0.07)", radius: 220, targetRadius: 220 },
+          { x: canvas.width * 0.7, y: canvas.height * 0.65, vx: -0.08, vy: 0.1, color: "rgba(47, 128, 236, 0.07)", radius: 260, targetRadius: 260 },
+        ]
+      : [
+          { x: canvas.width * 0.25, y: canvas.height * 0.25, vx: 0.15, vy: 0.1, color: "rgba(235, 87, 87, 0.08)", radius: 300, targetRadius: 300 },
+          { x: canvas.width * 0.75, y: canvas.height * 0.3, vx: -0.1, vy: 0.15, color: "rgba(47, 128, 236, 0.08)", radius: 350, targetRadius: 350 },
+          { x: canvas.width * 0.5, y: canvas.height * 0.7, vx: 0.08, vy: -0.12, color: "rgba(33, 150, 82, 0.08)", radius: 400, targetRadius: 400 },
+          { x: canvas.width * 0.8, y: canvas.height * 0.8, vx: -0.12, vy: -0.08, color: "rgba(154, 81, 224, 0.08)", radius: 300, targetRadius: 300 },
+        ];
 
     // Loop
     let animationFrameId: number;
@@ -99,21 +108,23 @@ export default function NeuralBackground() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       });
 
-      // 2. Draw Digital Grid (subtle overlay grid in canvas to save DOM layers)
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.015)";
-      ctx.lineWidth = 1;
-      const gridSize = 60;
-      for (let x = 0; x < canvas.width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < canvas.height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
+      // 2. Draw Digital Grid (desktop only — expensive on mobile)
+      if (!isMobile) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.015)";
+        ctx.lineWidth = 1;
+        const gridSize = 60;
+        for (let x = 0; x < canvas.width; x += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
       }
 
       // 3. Update & Draw Neural Nodes

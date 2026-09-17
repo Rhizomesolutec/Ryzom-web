@@ -99,8 +99,8 @@ export default function Contact() {
             strokeDasharray="4 4"
           />
 
-          {/* Pulsing Hotspots (Bangalore, New York, London) */}
-          {/* Bangalore Hotspot */}
+          {/* Pulsing Hotspots (Ponnani / New York / London) */}
+          {/* Ponnani Hotspot */}
           <g>
             <circle cx="680" cy="280" r="6" fill="#2F80EC" />
             <circle cx="680" cy="280" r="16" stroke="#2F80EC" strokeWidth="1" className="animate-ping origin-center" />
@@ -159,8 +159,11 @@ export default function Contact() {
                 </div>
                 <div>
                   <span className="text-[9px] uppercase tracking-wider font-cascadia text-white/30 block">Email us</span>
-                  <a href="mailto:hello@ryzom.in" className="text-xs font-cascadia text-white hover:text-white transition-colors">
-                    hello@ryzom.in
+                  <a
+                    href="mailto:rhizomesolutec@gmail.com"
+                    className="text-xs font-cascadia text-white hover:text-white transition-colors"
+                  >
+                    rhizomesolutec@gmail.com
                   </a>
                 </div>
               </div>
@@ -172,7 +175,7 @@ export default function Contact() {
                 <div>
                   <span className="text-[9px] uppercase tracking-wider font-cascadia text-white/30 block">HQ Location</span>
                   <span className="text-xs font-cascadia text-white/70 group-hover:text-white transition-colors">
-                    Bangalore, Karnataka, India
+                    Ponnani, Malappuram District, Kerala, 679579
                   </span>
                 </div>
               </div>

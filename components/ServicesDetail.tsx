@@ -123,11 +123,11 @@ export default function ServicesDetail() {
   const [active, setActive] = useState(0);
   const activeService = SERVICES_DETAIL_DATA[active];
 
-  // Auto-advance 01 → 02 → 03… every 2 seconds
+  // Auto-advance 01 → 02 → 03… (slightly slower for readability)
   useEffect(() => {
     const timer = window.setInterval(() => {
       setActive((i) => (i + 1) % SERVICES_DETAIL_DATA.length);
-    }, 2000);
+    }, 3500);
     return () => window.clearInterval(timer);
   }, [active]);
 

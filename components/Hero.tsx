@@ -1138,7 +1138,7 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      className="relative min-h-[108svh] md:min-h-[160vh] flex flex-col overflow-x-hidden select-none pb-6 md:pb-0"
+      className="relative min-h-[100svh] md:min-h-[160vh] flex flex-col overflow-x-hidden select-none pb-2 md:pb-0"
     >
       {/* Living digital environment */}
       <canvas
@@ -1340,7 +1340,7 @@ export default function Hero() {
       </div>
 
       {/* ── Intro content — mobile: centered under Core / desktop: asymmetric left ── */}
-      <div className="relative z-10 w-full pt-[58svh] md:pt-44 px-6 md:px-24 lg:px-28 pb-2 md:pb-0">
+      <div className="relative z-10 w-full pt-[46svh] md:pt-44 px-6 md:px-24 lg:px-28 pb-2 md:pb-0">
         <div
           ref={contentRef}
           className="relative max-w-sm md:max-w-lg w-full mx-auto md:mx-0 flex flex-col items-center md:items-start text-center md:text-left gap-4 md:gap-6 will-change-transform"

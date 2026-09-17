@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Layers, TrendingUp, Link, Maximize, CheckCircle } from "lucide-react";
 
@@ -139,10 +139,18 @@ export default function WhyRyzom() {
   const activeStage = STAGES[activeIdx];
   const progressPct = activeIdx / (STAGES.length - 1);
 
+  // Auto-advance stages every 2s (works on mobile even when Core scroll-sync is active)
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setActiveIdx((i) => (i + 1) % STAGES.length);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [activeIdx]);
+
   return (
     <section
       id="why-ryzom"
-      className="relative min-h-screen py-16 md:py-32 bg-black overflow-hidden select-none flex flex-col justify-center"
+      className="relative min-h-0 md:min-h-screen py-6 md:py-32 bg-black overflow-hidden select-none flex flex-col justify-center"
     >
       <div
         className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[min(90vw,500px)] h-[min(90vw,500px)] rounded-full blur-3xl opacity-10 transition-colors duration-1000 pointer-events-none"
@@ -152,7 +160,7 @@ export default function WhyRyzom() {
       <div className="absolute top-0 bottom-0 left-1/2 w-[1.5px] bg-gradient-to-b from-brand-purple/15 via-white/5 to-[#2F80EC]/15 transform -translate-x-1/2 pointer-events-none z-0 hidden md:block" />
 
       <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-12 relative z-10 flex flex-col items-center">
-        <div className="mb-12 md:mb-24 text-center px-2">
+        <div className="mb-8 md:mb-24 text-center px-2">
           <span className="text-xs font-cascadia uppercase tracking-widest text-brand-blue mb-3 block">
             Why RYZOM
           </span>

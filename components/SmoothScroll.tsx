@@ -9,8 +9,27 @@ if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
+function isTouchMobile() {
+  return (
+    window.matchMedia("(max-width: 768px)").matches ||
+    window.matchMedia("(hover: none) and (pointer: coarse)").matches
+  );
+}
+
 export default function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    // Native scroll on mobile — Lenis causes lag / fighting with touch
+    if (isTouchMobile()) {
+      (window as any).lenis = null;
+      const refreshTimer = window.setTimeout(() => ScrollTrigger.refresh(), 120);
+      const onResize = () => ScrollTrigger.refresh();
+      window.addEventListener("resize", onResize);
+      return () => {
+        window.clearTimeout(refreshTimer);
+        window.removeEventListener("resize", onResize);
+      };
+    }
+
     const lenis = new Lenis({
       duration: 0.9,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),

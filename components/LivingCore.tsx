@@ -166,7 +166,8 @@ export default function LivingCore() {
     const handleResize = () => {
       const w = window.innerWidth;
       let scale = 1.0;
-      if (w <= 768) scale = 0.635;
+      // Keep Core clearly visible on phones (same presence as desktop, slightly smaller)
+      if (w <= 768) scale = 0.92;
       else if (w <= 1024) scale = 0.923;
       else scale = 1.0;
       setCoreScale(scale);
@@ -195,7 +196,7 @@ export default function LivingCore() {
     };
   }, []);
 
-  const executeStep = useCallback((targetStepIdx: number) => {
+  const executeStep = useCallback((targetStepIdx: number, opts?: { skipScroll?: boolean }) => {
     const newIdx = Math.max(0, Math.min(JOURNEY_STEPS.length - 1, targetStepIdx));
     // Already on this step (e.g. last Contact step) — don't re-fire scroll to page bottom
     if (newIdx === stepRef.current) return;
@@ -205,6 +206,7 @@ export default function LivingCore() {
     stepRef.current = newIdx;
     const step = JOURNEY_STEPS[newIdx];
     const prevStep = JOURNEY_STEPS[prevIdx];
+    const skipScroll = !!opts?.skipScroll;
 
     // 1. Move core toward this journey target (snappy — kills prior tween so reverse isn't lagged)
     const elemIdx = existingTargets.indexOf(step.targetSelector);
@@ -212,7 +214,7 @@ export default function LivingCore() {
       gsap.killTweensOf(stateRef.current);
       gsap.to(stateRef.current, {
         progressIndex: elemIdx,
-        duration: goingUp ? 0.4 : 0.55,
+        duration: goingUp ? 0.35 : 0.45,
         ease: "power2.out",
         overwrite: true,
       });
@@ -231,22 +233,24 @@ export default function LivingCore() {
       }
     }
 
-    // 2. Scroll — shorter durations on reverse so upward never feels stuck
-    const scrollDur = goingUp ? 0.45 : 0.55;
-    const sectionChanged = !prevStep || prevStep.sectionId !== step.sectionId;
+    // 2. Scroll — desktop only. Mobile uses native scroll + scroll-sync (skipScroll)
+    if (!skipScroll) {
+      const scrollDur = goingUp ? 0.45 : 0.55;
+      const sectionChanged = !prevStep || prevStep.sectionId !== step.sectionId;
 
-    if (step.sectionId === "why-ryzom") {
-      if (sectionChanged || prevSectionRef.current !== "why-ryzom") {
-        scrollToY(getSectionScrollY("why-ryzom"), scrollDur);
+      if (step.sectionId === "why-ryzom") {
+        if (sectionChanged || prevSectionRef.current !== "why-ryzom") {
+          scrollToY(getSectionScrollY("why-ryzom"), scrollDur);
+        }
+      } else if (step.sectionId === "work" && step.workCardIdx !== undefined) {
+        scrollToY(getWorkStepScrollY(step.workCardIdx), scrollDur);
+      } else if (step.sectionId === "services" && step.servicesCardIdx !== undefined) {
+        scrollToY(getTargetCenteredScrollY(step.targetSelector), scrollDur);
+      } else if (step.sectionId === "about" || step.sectionId === "contact") {
+        scrollToY(getTargetCenteredScrollY(step.targetSelector), scrollDur);
+      } else {
+        scrollToY(getSectionScrollY(step.sectionId), scrollDur);
       }
-    } else if (step.sectionId === "work" && step.workCardIdx !== undefined) {
-      scrollToY(getWorkStepScrollY(step.workCardIdx), scrollDur);
-    } else if (step.sectionId === "services" && step.servicesCardIdx !== undefined) {
-      scrollToY(getTargetCenteredScrollY(step.targetSelector), scrollDur);
-    } else if (step.sectionId === "about" || step.sectionId === "contact") {
-      scrollToY(getTargetCenteredScrollY(step.targetSelector), scrollDur);
-    } else {
-      scrollToY(getSectionScrollY(step.sectionId), scrollDur);
     }
 
     prevSectionRef.current = step.sectionId;
@@ -306,18 +310,67 @@ export default function LivingCore() {
       }
     }
 
-    // Shorter lock on reverse so upward scroll stays fluid
+    // Shorter lock on reverse so upward scroll stays fluid (almost none on mobile scroll-sync)
     isLockRef.current = true;
     if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
     lockTimerRef.current = setTimeout(() => {
       isLockRef.current = false;
       lockTimerRef.current = null;
-    }, goingUp ? 320 : 480);
+    }, skipScroll ? 120 : goingUp ? 320 : 480);
   }, [existingTargets]);
 
-  // Wheel / arrow / touch — step journey; fast flicks skip steps so reverse isn't sticky
+  // Desktop: wheel/keyboard step journey. Mobile: native scroll drives Core (no touch hijack = no lag)
   useEffect(() => {
     if (!isReady || existingTargets.length === 0) return;
+
+    const isMobile =
+      window.matchMedia("(max-width: 768px)").matches ||
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+    if (isMobile) {
+      let raf = 0;
+      const syncFromScroll = () => {
+        raf = 0;
+        const midY = window.innerHeight * 0.42;
+        let bestIdx = 0;
+        let bestDist = Infinity;
+
+        for (let i = 0; i < JOURNEY_STEPS.length; i++) {
+          const el = document.querySelector(JOURNEY_STEPS[i].targetSelector) as HTMLElement | null;
+          if (!el) continue;
+          const rect = el.getBoundingClientRect();
+          const cy = rect.top + rect.height / 2;
+          const dist = Math.abs(cy - midY);
+          // Prefer targets near/above mid viewport so Core stays on-screen while scrolling
+          if (cy < window.innerHeight * 0.92 && cy > -40 && dist < bestDist) {
+            bestDist = dist;
+            bestIdx = i;
+          }
+        }
+
+        if (bestIdx !== stepRef.current) {
+          executeStep(bestIdx, { skipScroll: true });
+        }
+      };
+
+      const onScroll = () => {
+        if (raf) return;
+        raf = requestAnimationFrame(syncFromScroll);
+      };
+
+      // Initial sync so Core appears immediately on mobile
+      syncFromScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll, { passive: true });
+
+      return () => {
+        if (raf) cancelAnimationFrame(raf);
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
+        if (dissolveTimerRef.current) clearTimeout(dissolveTimerRef.current);
+      };
+    }
 
     const handleWheel = (e: WheelEvent) => {
       // While locked, still prevent native scroll fighting Lenis — but don't queue
@@ -334,19 +387,6 @@ export default function LivingCore() {
       executeStep(stepRef.current + dir * burst);
     };
 
-    let touchStartY = 0;
-    const handleTouchStart = (e: TouchEvent) => {
-      touchStartY = e.touches[0].clientY;
-    };
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (isLockRef.current) return;
-      const deltaY = touchStartY - e.changedTouches[0].clientY;
-      if (Math.abs(deltaY) < 36) return;
-      const dir = deltaY > 0 ? 1 : -1;
-      const burst = Math.min(3, Math.max(1, Math.round(Math.abs(deltaY) / 120)));
-      executeStep(stepRef.current + dir * burst);
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       if (isLockRef.current) return;
       if (["ArrowDown", "PageDown", "Space"].includes(e.code)) {
@@ -359,14 +399,10 @@ export default function LivingCore() {
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
-    window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchend", handleTouchEnd, { passive: true });
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       window.removeEventListener("wheel", handleWheel);
-      window.removeEventListener("touchstart", handleTouchStart);
-      window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("keydown", handleKeyDown);
       if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
       if (dissolveTimerRef.current) clearTimeout(dissolveTimerRef.current);
@@ -410,8 +446,9 @@ export default function LivingCore() {
     const trail: Particle[] = [];
     const disperse: Particle[] = [];
 
-    // Initialize orbiters
-    for (let i = 0; i < 35; i++) {
+    // Fewer orbiters on mobile — keeps Core smooth without lag
+    const orbiterCount = window.innerWidth <= 768 ? 14 : 35;
+    for (let i = 0; i < orbiterCount; i++) {
       orbiters.push({
         x: 0,
         y: 0,
@@ -427,6 +464,7 @@ export default function LivingCore() {
       });
     }
 
+    const softGlow = window.innerWidth <= 768 ? 0 : 1;
     let animFrame: number;
 
     const updateAndRender = () => {
@@ -571,7 +609,7 @@ export default function LivingCore() {
         ctx.arc(p.x, p.y, p.size * ratio, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8 * scaleRef.current;
+        ctx.shadowBlur = 8 * scaleRef.current * softGlow;
         ctx.globalAlpha = ratio * 0.55;
         ctx.fill();
       }
@@ -593,7 +631,7 @@ export default function LivingCore() {
             ctx.arc(p.x, p.y, p.size * scaleRef.current, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.shadowColor = p.color;
-            ctx.shadowBlur = 6 * scaleRef.current;
+            ctx.shadowBlur = 6 * scaleRef.current * softGlow;
             ctx.globalAlpha = 0.8;
             ctx.fill();
           }
@@ -632,7 +670,7 @@ export default function LivingCore() {
         ctx.arc(p.x, p.y, p.size * ratio, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
         ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8 * scaleRef.current;
+        ctx.shadowBlur = 8 * scaleRef.current * softGlow;
         ctx.globalAlpha = ratio * 0.75;
         ctx.fill();
       }

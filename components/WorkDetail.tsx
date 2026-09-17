@@ -22,31 +22,11 @@ interface Project {
 
 const PROJECTS_DATA: Project[] = [
   {
-    id: "brand-systems",
-    title: "Brand Systems",
-    category: "Branding & Design",
-    image: "rgba(235, 87, 87, 0.2)",
-    video: "/work/Work%201.mp4",
-    color: "#EB5757",
-    summary: "Identity systems that scale across every product surface.",
-    challenge:
-      "Build a distinctive brand foundation — identity, UI language, and creative direction — that feels premium and scales across every touchpoint.",
-    process:
-      "We defined visual strategy, typography, and design systems, then translated them into interfaces and assets the product and marketing teams can grow from.",
-    solution:
-      "A cohesive brand system: logo architecture, color & type rules, UI kits, and creative templates that keep every surface unmistakably on-brand.",
-    results:
-      "Faster creative output, clearer brand recognition, and a visual language teams can ship with without reinventing the look each time.",
-    stats: [
-      { label: "Brand Consistency", value: "+92%" },
-      { label: "Design Velocity", value: "3×" },
-    ],
-  },
-  {
     id: "product-platforms",
     title: "Product Platforms",
     category: "Development",
     image: "rgba(47, 128, 236, 0.2)",
+    video: "/work/Work%201.mp4",
     color: "#2F80EC",
     summary: "Fast, durable products engineered for real growth.",
     challenge:
@@ -63,10 +43,32 @@ const PROJECTS_DATA: Project[] = [
     ],
   },
   {
+    id: "brand-systems",
+    title: "Brand Systems",
+    category: "Branding & Design",
+    image: "rgba(235, 87, 87, 0.2)",
+    video: "/work/work%202.mp4",
+    color: "#EB5757",
+    summary: "Identity systems that scale across every product surface.",
+    challenge:
+      "Build a distinctive brand foundation — identity, UI language, and creative direction — that feels premium and scales across every touchpoint.",
+    process:
+      "We defined visual strategy, typography, and design systems, then translated them into interfaces and assets the product and marketing teams can grow from.",
+    solution:
+      "A cohesive brand system: logo architecture, color & type rules, UI kits, and creative templates that keep every surface unmistakably on-brand.",
+    results:
+      "Faster creative output, clearer brand recognition, and a visual language teams can ship with without reinventing the look each time.",
+    stats: [
+      { label: "Brand Consistency", value: "+92%" },
+      { label: "Design Velocity", value: "3×" },
+    ],
+  },
+  {
     id: "growth-campaigns",
     title: "Growth Campaigns",
     category: "Digital Marketing",
     image: "rgba(33, 150, 82, 0.2)",
+    video: "/work/work%203.mp4",
     color: "#219652",
     summary: "Campaign systems that turn attention into measurable lift.",
     challenge:
@@ -87,6 +89,7 @@ const PROJECTS_DATA: Project[] = [
     title: "Motion Stories",
     category: "Media Production",
     image: "rgba(242, 201, 77, 0.2)",
+    video: "/work/work%204.mp4",
     color: "#F2C94D",
     summary: "Cinematic media that carries brand philosophy in motion.",
     challenge:
@@ -311,7 +314,7 @@ function WorkPanel({
               <>
                 <video
                   ref={videoRef}
-                  className="absolute inset-0 h-full w-full object-cover object-center"
+                  className="absolute inset-0 h-full w-full min-h-full min-w-full object-cover object-center scale-[1.2] origin-center will-change-transform"
                   src={project.video}
                   muted
                   loop
